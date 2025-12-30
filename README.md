@@ -1,8 +1,8 @@
 # Backend Engineering Intern – Case Study
 
-Name: Anshu Babhure
-Role: Backend Engineering Intern
-Company: Bynry Inc
+**Name:** Anshu Babhure  
+**Role:** Backend Engineering Intern  
+**Company:** Bynry Inc  
 
 ## 1. Introduction
 
@@ -54,7 +54,7 @@ To resolve these issues:
 
 ## 3. Corrected API Implementation (Product Creation)
 
-
+```python
 from flask import request
 from decimal import Decimal
 from sqlalchemy.exc import IntegrityError
@@ -108,6 +108,7 @@ def create_product():
         db.session.rollback()
         return {"error": "Internal server error"}, 500
 
+---
 ## 4. Part 2 – Database Design
 
 ### Design Goals
@@ -126,29 +127,108 @@ The database schema is designed to:
 **Companies**  
 Stores company-level information.
 
+
+```sql
+CREATE TABLE companies (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+``` 
 **Warehouses**  
 Each company can own multiple warehouses.
 
+```sql
+CREATE TABLE warehouses (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    company_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    location VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (company_id) REFERENCES companies(id)
+);
+```
 **Products**  
 Stores product details. Products are not directly tied to warehouses.
+
+```sql
+CREATE TABLE products (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    sku VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    product_type VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 **Inventory**  
 Maps products to warehouses and tracks stock quantity per warehouse.
 
+```sql
+CREATE TABLE inventory (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (product_id, warehouse_id),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (warehouse_id) REFERENCES warehouses(id)
+);
+```
+
 **Inventory History**  
 Tracks every inventory change for audit and reporting purposes.
+
+```sql
+CREATE TABLE inventory_history (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    inventory_id INT NOT NULL,
+    quantity_change INT NOT NULL,
+    change_reason VARCHAR(255),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (inventory_id) REFERENCES inventory(id)
+);
+```
 
 **Suppliers**  
 Stores supplier details.
 
+```sql
+CREATE TABLE suppliers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    contact_email VARCHAR(255)
+);
+```
+
 **Product Suppliers**  
 Many-to-many mapping between products and suppliers.
 
+```sql
+CREATE TABLE product_suppliers (
+    product_id INT NOT NULL,
+    supplier_id INT NOT NULL,
+    PRIMARY KEY (product_id, supplier_id),
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+);
+```
 **Product Bundles**  
 Supports bundled or combo products.
 
----
+```sql
 
+CREATE TABLE product_bundles (
+    bundle_product_id INT NOT NULL,
+    child_product_id INT NOT NULL,
+    quantity INT NOT NULL,
+    PRIMARY KEY (bundle_product_id, child_product_id),
+    FOREIGN KEY (bundle_product_id) REFERENCES products(id),
+    FOREIGN KEY (child_product_id) REFERENCES products(id)
+);
+```
 ### Key Design Decisions
 - Products are decoupled from warehouses
 - Inventory table manages product–warehouse relationships
@@ -160,9 +240,8 @@ Supports bundled or combo products.
 
 ### Assumptions
 - SKU is globally unique
-- Inventory is tracked per warehouse
-- Products are company-specific
 - Price precision is critical
+- Inventory changes must be auditable
 
 ---
 
@@ -172,6 +251,7 @@ Supports bundled or combo products.
 - Are inventory updates manual, automated, or both?
 - Can suppliers supply products to multiple companies?
 - Should bundle pricing be calculated automatically or manually?
+
 
 
 
@@ -187,15 +267,17 @@ The goal of this API is to:
 
 
 ### API Endpoint
-
+```
     GET /api/companies/{company_id}/alerts/low-stock
-
+```
 
 ### Business Assumptions
 - Each product has a low_stock_threshold
 - Recent sales refers to sales in the last 30 days
 - One primary supplier exists per product
 - Average daily sales is available for calculation
+- For alerting, one primary supplier is assumed, while the schema still supports multiple suppliers.
+
 
 ### API Logic
 - Fetch inventory across all warehouses for a company
@@ -208,6 +290,10 @@ The goal of this API is to:
 
 ### Implementation
 
+```python
+from flask import request
+from decimal import Decimal
+from sqlalchemy.exc import IntegrityError
 
 @app.route('/api/companies/<int:company_id>/alerts/low-stock', methods=['GET'])
 def low_stock_alerts(company_id):
@@ -255,7 +341,7 @@ def low_stock_alerts(company_id):
         "alerts": alerts,
         "total_alerts": len(alerts)
     }, 200
-
+```
 ### Edge Cases Handled
 - Products with zero sales are ignored
 - Multiple warehouses are supported
