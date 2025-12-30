@@ -54,7 +54,7 @@ To resolve these issues:
 
 ## 3. Corrected API Implementation (Product Creation)
 
-```python
+
 from flask import request
 from decimal import Decimal
 from sqlalchemy.exc import IntegrityError
@@ -208,7 +208,7 @@ The goal of this API is to:
 
 ### Implementation
 
-```python
+
 @app.route('/api/companies/<int:company_id>/alerts/low-stock', methods=['GET'])
 def low_stock_alerts(company_id):
     alerts = []
